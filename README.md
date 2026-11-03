@@ -2,7 +2,7 @@
 
 Este repositorio contiene el diseño, especificación e implementación de una aplicación web progresiva (PWA) para el **Taller de Don Ramiro**, desarrollada aplicando la metodología **Spec-Driven Development (SDD)**.
 
-🔗 **[Ver Demo Interactiva en Vivo (GitHub Pages)](https://TU-USUARIO.github.io/TU-REPOSITORIO/)**
+🔗 **[Ver Demo Interactiva en Vivo (GitHub Pages)](https://criskyo.github.io/taller-don-ramiro-pwa/)**
 
 ---
 
