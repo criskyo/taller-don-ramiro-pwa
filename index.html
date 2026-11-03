@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Taller Don Ramiro - Cotización Extra PWA</title>
+  <meta name="description" content="PWA de aprobación instantánea de cotizaciones adicionales con respaldo probatorio inmutable para Taller Don Ramiro.">
+  <meta name="theme-color" content="#020617">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              yellow: '#f59e0b',
+              dark: '#020617',
+              card: '#0f172a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=JetBrains+Mono:wght@500;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Estilo de matrícula automotriz colombiana / latinoamericana */
+    .plate-badge {
+      background: linear-gradient(180deg, #facc15 0%, #eab308 100%);
+      color: #020617;
+      border: 3px solid #0f172a;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), inset 0 2px 2px rgba(255, 255, 255, 0.6);
+      letter-spacing: 0.15em;
+    }
+    /* Botones de acción mecánica para guantes */
+    .mechanic-btn {
+      min-height: 64px;
+      touch-action: manipulation;
+    }
+    .mechanic-btn:active {
+      transform: scale(0.97);
+    }
+    /* Canvas de firma táctil */
+    #sig-canvas {
+      touch-action: none;
+    }
+    /* Animación de pulso para grabación */
+    @keyframes pulse-record {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(0.98); }
+    }
+    .recording-active {
+      animation: pulse-record 1s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- ========================================== -->
+  <!-- BARRA SUPERIOR DE CONTROL / SWITCH DE DEMO -->
+  <!-- ========================================== -->
+  <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 px-4 py-2.5 shadow-md">
+    <div class="max-w-md mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500 text-slate-950 font-black text-base shadow">
+          🔧
+        </span>
+        <div>
+          <h1 class="text-xs font-black uppercase tracking-wider text-amber-400">Taller Don Ramiro</h1>
+          <p class="text-[10px] text-slate-400 font-mono">SPEC-001 • PWA Inmutable</p>
+        </div>
+      </div>
+
+      <!-- Selector de Vistas -->
+      <div class="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+        <button id="tab-mechanic" onclick="switchView('MECANICO')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-amber-500 text-slate-950 shadow">
+          <span>🛠️ Mecánico</span>
+        </button>
+        <button id="tab-client" onclick="switchView('CLIENTE')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white">
+          <span>📱 Cliente</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <main class="flex-1 max-w-md w-full mx-auto p-4 pb-24">
+
+    <!-- ============================================================= -->
+    <!-- VISTA 1: MECÁNICO ("MANOS SUCIAS" / MODO INDUSTRIAL CA-01)    -->
+    <!-- ============================================================= -->
+    <div id="view-mechanic" class="space-y-5">
+
+      <!-- Ficha del Vehículo & Placa Física -->
+      <div class="bg-slate-900 border-2 border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+            Elevador #2 • En Servicio
+          </span>
+          <h2 class="text-xl font-black text-white flex items-center gap-2">
+            Renault Stepway
+          </h2>
+          <span class="text-xs text-slate-400">Cliente: Carlos Mendoza</span>
+        </div>
+        <div class="plate-badge px-3 py-1.5 rounded-lg font-mono font-black text-2xl text-center">
+          KJM-482
+        </div>
+      </div>
+
+      <!-- Estado Actual del Trabajo (CA-02) -->
+      <div id="order-status-banner" class="p-3.5 rounded-xl border-2 font-bold text-sm flex items-center justify-between bg-blue-950/60 border-blue-500/80 text-blue-300">
+        <div class="flex items-center gap-2.5">
+          <span id="order-status-icon" class="text-lg">⏳</span>
+          <div>
+            <span class="text-[10px] uppercase tracking-wider block text-blue-400 font-mono">ESTADO DEL VEHÍCULO</span>
+            <span id="order-status-text" class="text-base font-black">EN REVISIÓN</span>
+          </div>
+        </div>
+        <span class="text-xs font-mono bg-blue-900/60 px-2 py-1 rounded text-blue-300">Fase 2 de 4</span>
+      </div>
+
+      <!-- PASO 1: EVIDENCIA FOTOGRÁFICA (TOCAR / CAMBIAR FOTO) -->
+      <div class="space-y-2">
+        <label class="block text-sm font-black uppercase tracking-wide text-amber-400 flex items-center gap-2">
+          <span>1. Evidencia Fotográfica (1 Toque)</span>
+        </label>
+        
+        <input type="file" id="camera-input" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoUpload(event)">
+        
+        <div onclick="document.getElementById('camera-input').click()" class="cursor-pointer group relative overflow-hidden rounded-2xl border-2 border-dashed border-amber-500 bg-slate-900 min-h-[140px] flex flex-col items-center justify-center p-3 transition active:scale-[0.98]">
+          <img id="photo-preview" src="https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&q=80" alt="Evidencia" class="w-full h-36 object-cover rounded-xl border border-slate-700">
+          <div class="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] flex items-center justify-center gap-2 text-white font-bold text-base group-hover:bg-slate-950/60 transition">
+            <span class="w-10 h-10 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-xl shadow-lg">📸</span>
+            <span class="bg-slate-900/90 px-3 py-1.5 rounded-lg border border-slate-700">Tocar para cambiar foto</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASO 2: SELECCIÓN DE FALLA PREDEFINIDA (SIN TECLADO QWERTY) -->
+      <div class="space-y-2">
+        <label class="block text-sm font-black uppercase tracking-wide text-amber-400">
+          2. Falla Detectada (1 Toque - Sin Teclado)
+        </label>
+        <div class="grid grid-cols-2 gap-2.5" id="fault-tags-container">
+          <!-- Tags inyectados por JS -->
+        </div>
+
+        <!-- Botón Gigante de Dictado por Voz -->
+        <button id="voice-btn" onclick="toggleVoiceDictation()" class="w-full mechanic-btn rounded-xl font-bold text-base px-4 flex items-center justify-center gap-3 border-2 border-slate-700 bg-slate-900 text-white hover:border-amber-500 transition">
+          <span id="voice-icon" class="text-2xl">🎙️</span>
+          <span id="voice-text">DICTAR NOTA POR VOZ</span>
+        </button>
+
+        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-sm text-slate-300">
+          <span class="text-[11px] font-mono uppercase text-amber-400 block font-bold mb-1">Transcripción de voz:</span>
+          <p id="voice-transcript" class="italic">"Desgaste crítico al 90% en pastillas y disco rayado. Riesgo inminente al frenar."</p>
+        </div>
+      </div>
+
+      <!-- PASO 3: PAD NUMÉRICO GIGANTE PARA MANOS CON GRASA (CA-01) -->
+      <div class="space-y-2">
+        <label class="block text-sm font-black uppercase tracking-wide text-amber-400">
+          3. Monto Adicional (Teclado Guante)
+        </label>
+        
+        <!-- Pantalla del Monto -->
+        <div class="bg-slate-900 border-2 border-amber-500 rounded-xl p-4 text-right font-mono text-3xl font-black text-amber-400 tracking-wider shadow-inner">
+          <span class="text-sm font-sans text-slate-400 mr-2">COP</span>
+          <span id="price-display">$ 185.000</span>
+        </div>
+
+        <!-- Teclado Numérico Gigante -->
+        <div class="grid grid-cols-3 gap-2 pt-1 font-mono">
+          <button onclick="pressNumpad('1')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">1</button>
+          <button onclick="pressNumpad('2')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">2</button>
+          <button onclick="pressNumpad('3')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">3</button>
+
+          <button onclick="pressNumpad('4')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">4</button>
+          <button onclick="pressNumpad('5')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">5</button>
+          <button onclick="pressNumpad('6')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">6</button>
+
+          <button onclick="pressNumpad('7')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">7</button>
+          <button onclick="pressNumpad('8')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">8</button>
+          <button onclick="pressNumpad('9')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">9</button>
+
+          <button onclick="pressNumpad('C')" class="mechanic-btn bg-red-950/60 hover:bg-red-900 active:bg-red-600 text-red-400 active:text-white rounded-xl text-xl font-black border border-red-900">C</button>
+          <button onclick="pressNumpad('0')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-2xl font-black border border-slate-700">0</button>
+          <button onclick="pressNumpad('000')" class="mechanic-btn bg-slate-800 hover:bg-slate-700 active:bg-amber-500 active:text-slate-950 rounded-xl text-lg font-black border border-slate-700">000</button>
+        </div>
+      </div>
+
+      <!-- BOTÓN PRINCIPAL DE ENVÍO Y BLOQUEO AUTOMÁTICO (CA-02) -->
+      <div class="pt-2">
+        <button onclick="submitQuote()" class="w-full min-h-[72px] bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-lg rounded-2xl shadow-xl flex items-center justify-center gap-3 active:scale-95 transition">
+          <span class="text-2xl">⚡</span>
+          <span>PAUSAR COCHE Y ENVIAR AL CLIENTE</span>
+        </button>
+        <p class="text-[11px] text-center text-slate-400 mt-2">
+          Bloquea el estado a <strong class="text-amber-400">ESPERANDO APROBACIÓN</strong> y crea el link de WhatsApp.
+        </p>
+      </div>
+
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- VISTA 2: CLIENTE (PORTAL DE CONFIANZA & AUDITORÍA CA-03/04/05)-->
+    <!-- ============================================================= -->
+    <div id="view-client" class="hidden space-y-4">
+
+      <!-- Encabezado de Confianza -->
+      <div class="bg-white text-slate-900 border border-slate-200 rounded-2xl p-4 shadow-sm">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+              Taller Mecánico Don Ramiro
+            </span>
+            <h2 class="text-xl font-black text-slate-900 flex items-center gap-2">
+              🚗 Renault Stepway
+            </h2>
+          </div>
+          <span class="plate-badge font-mono font-black px-2.5 py-1 rounded text-sm">
+            KJM-482
+          </span>
+        </div>
+
+        <!-- Barra de Progreso en Vivo -->
+        <div class="mt-4">
+          <div class="flex justify-between text-[11px] font-bold text-slate-600 mb-1.5 font-mono">
+            <span>1. Recibido</span>
+            <span id="step-approval" class="text-amber-600 font-black">2. Aprobación</span>
+            <span id="step-repair" class="text-slate-400">3. Reparación</span>
+            <span class="text-slate-400">4. Listo</span>
+          </div>
+          <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+            <div id="progress-bar-fill" class="h-full bg-amber-500 transition-all duration-500" style="width: 50%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tarjeta Principal de la Cotización Extra -->
+      <div class="bg-white text-slate-900 border-2 border-slate-200 rounded-2xl overflow-hidden shadow-md">
+        
+        <!-- Banner Dinámico de Estado -->
+        <div id="quote-status-banner" class="p-3.5 font-black text-sm flex items-center gap-2 bg-amber-500 text-slate-950">
+          <span id="quote-status-icon" class="text-lg">⚠️</span>
+          <span id="quote-status-title">REPARACIÓN EXTRA: REQUIERE TU AUTORIZACIÓN</span>
+        </div>
+
+        <div class="p-4 space-y-4">
+          <!-- Foto de la Evidencia -->
+          <div>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+              Foto enviada por el mecánico en foso:
+            </span>
+            <img id="client-photo-view" src="https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&q=80" alt="Evidencia mecánica" class="w-full h-48 object-cover rounded-xl border border-slate-200 shadow-sm">
+          </div>
+
+          <!-- Detalle y Monto Extra -->
+          <div class="flex justify-between items-start bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+            <div>
+              <span class="text-[11px] font-bold uppercase text-slate-500">Repuesto / Reparación</span>
+              <h3 id="client-part-tag" class="text-lg font-black text-slate-900">Pastillas de Freno</h3>
+            </div>
+            <div class="text-right">
+              <span class="text-[11px] font-bold uppercase text-slate-500 block">Costo Adicional</span>
+              <span id="client-price-tag" class="font-mono text-2xl font-black text-emerald-600">$ 185.000</span>
+            </div>
+          </div>
+
+          <!-- Reporte de Voz Transcrito -->
+          <div class="bg-amber-50 border border-amber-200 p-3.5 rounded-xl text-xs text-slate-800 leading-relaxed">
+            <div class="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+              <span>🎙️</span>
+              <span>Nota de voz del mecánico:</span>
+            </div>
+            <p id="client-voice-note" class="italic text-slate-700">"Desgaste crítico al 90% en pastillas y disco rayado. Riesgo inminente al frenar."</p>
+          </div>
+
+          <!-- SECCIÓN DE APROBACIÓN TÁCTIL (CA-03) -->
+          <div id="client-approval-form" class="border-t border-slate-200 pt-3 space-y-3">
+            
+            <!-- Paso 1: Últimos 4 dígitos del celular -->
+            <div>
+              <label class="block text-xs font-bold text-slate-800 mb-1">
+                1. Digita los últimos 4 dígitos de tu celular registrado:
+              </label>
+              <input type="tel" id="input-phone-last4" maxlength="4" placeholder="Ej: 4912" oninput="validateClientForm()" class="w-full p-3 border-2 border-slate-300 rounded-xl font-mono text-lg font-bold text-slate-900 focus:border-amber-500 outline-none">
+            </div>
+
+            <!-- Paso 2: Canvas de Firma Táctil -->
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <label class="text-xs font-bold text-slate-800">
+                  2. Dibuja tu firma con el dedo en el recuadro:
+                </label>
+                <button type="button" onclick="clearSignatureCanvas()" class="text-[11px] font-bold text-red-600 hover:underline flex items-center gap-1">
+                  🗑️ Borrar firma
+                </button>
+              </div>
+              <div class="relative bg-slate-50 border-2 border-dashed border-slate-400 rounded-xl overflow-hidden">
+                <canvas id="sig-canvas" width="340" height="110" class="w-full h-[110px] cursor-crosshair"></canvas>
+                <div id="sig-placeholder" class="absolute inset-0 pointer-events-none flex items-center justify-center text-slate-400 text-xs italic">
+                  ✍️ Firma aquí con tu dedo o mouse
+                </div>
+              </div>
+            </div>
+
+            <!-- Paso 3: Checkbox Legal -->
+            <label class="flex items-start gap-2.5 p-3 bg-slate-50 border border-slate-200 rounded-xl cursor-pointer">
+              <input type="checkbox" id="legal-checkbox" onchange="validateClientForm()" class="mt-0.5 w-5 h-5 accent-emerald-600 rounded">
+              <span class="text-xs text-slate-700 leading-snug">
+                Autorizo expresamente al <strong>Taller Don Ramiro</strong> a realizar la reparación adicional por <strong id="legal-price-span" class="text-emerald-700 font-mono font-bold">$ 185.000</strong>. Entiendo que este registro es inmutable y vinculante.
+              </span>
+            </label>
+
+            <!-- Botones de Decisión -->
+            <div class="space-y-2 pt-1">
+              <button id="btn-approve" disabled onclick="resolveQuote('APROBADO')" class="w-full min-h-[58px] rounded-xl font-black text-base flex items-center justify-center gap-2 transition bg-slate-200 text-slate-400 cursor-not-allowed shadow-none">
+                <span>✅</span>
+                <span id="btn-approve-label">APROBAR REPARACIÓN ($ 185.000)</span>
+              </button>
+
+              <button type="button" onclick="resolveQuote('RECHAZADO')" class="w-full min-h-[48px] bg-white hover:bg-red-50 text-red-600 border border-red-200 rounded-xl font-bold text-xs transition">
+                ❌ No autorizo esta reparación adicional
+              </button>
+            </div>
+
+          </div>
+
+          <!-- SELLO DE AUDITORÍA INMUTABLE (CA-04 y CA-05) -->
+          <div id="audit-certificate-box" class="hidden bg-slate-900 text-slate-100 p-4 rounded-xl border-2 border-dashed border-emerald-400 font-mono text-xs space-y-2 shadow-inner">
+            <div class="flex items-center gap-2 text-emerald-400 font-black text-sm pb-1 border-b border-slate-800">
+              <span class="text-base">🛡️</span>
+              <span>CERTIFICADO DE AUDITORÍA INMUTABLE</span>
+            </div>
+            <div class="space-y-1.5 text-slate-300">
+              <p><strong>ID Cotización:</strong> <span id="audit-quote-id" class="text-amber-400">COT-8842</span></p>
+              <p><strong>Decisión Legal:</strong> <span id="audit-action" class="font-bold">APROBADO</span></p>
+              <p><strong>Fecha/Hora UTC:</strong> <span id="audit-timestamp" class="text-slate-400">2026-11-02T21:40:00Z</span></p>
+              <p><strong>IP Verificada:</strong> <span id="audit-ip" class="text-slate-400">186.84.22.109</span></p>
+              <p><strong>Tel. Validado:</strong> <span id="audit-phone" class="text-slate-400">***-4912</span></p>
+              <p><strong>Firma Digital:</strong> <span class="text-emerald-400 font-bold">REGISTRADA Y SELLADA</span></p>
+              <div class="pt-2">
+                <span class="text-[10px] text-slate-500 block mb-1">Firma capturada:</span>
+                <img id="audit-sig-preview" src="" alt="Firma del cliente" class="bg-white rounded p-1 h-14 border border-slate-700">
+              </div>
+            </div>
+            <div class="text-[10px] text-slate-500 pt-1 border-t border-slate-800 flex justify-between">
+              <span>Hash SHA-256 Verificado</span>
+              <span>Inmutable</span>
+            </div>
+          </div>
+
+          <!-- Botón para compartir WhatsApp -->
+          <div class="pt-2">
+            <button onclick="shareViaWhatsApp()" class="w-full min-h-[50px] bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-md transition active:scale-95">
+              <span>💬</span>
+              <span>COMPARTIR COMPROBANTE POR WHATSAPP</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Botón para reiniciar demostración -->
+      <div class="text-center pt-2">
+        <button onclick="resetDemo()" class="text-xs text-slate-400 hover:text-slate-200 underline font-mono">
+          ↺ Reiniciar estado de la demostración
+        </button>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ========================================== -->
+  <!-- SCRIPT DE COMPORTAMIENTO & PERSISTENCIA    -->
+  <!-- ========================================== -->
+  <script>
+    // Listado de fallas frecuentes (1 toque)
+    const COMMON_FAULTS = [
+      'Pastillas de Freno',
+      'Cambio de Batería',
+      'Fuga de Aceite / Empaque',
+      'Amortiguadores',
+      'Bomba de Agua',
+      'Correa de Repartición'
+    ];
+
+    // Estado en memoria
+    let currentView = 'MECANICO';
+    let orderStatus = 'EN_REVISION'; // 'EN_REVISION' | 'ESPERANDO_APROBACION' | 'EN_REPARACION' | 'RECHAZADO'
+    let selectedFault = 'Pastillas de Freno';
+    let priceNumber = 185000;
+    let photoUrl = 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&q=80';
+    let voiceTranscript = 'Desgaste crítico al 90% en pastillas y disco rayado. Riesgo inminente al frenar.';
+    let isRecording = false;
+    let quoteStatus = 'PENDIENTE'; // 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
+    let auditRecord = null;
+    let hasSigned = false;
+
+    // Canvas de firma
+    const canvas = document.getElementById('sig-canvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+
+    // Inicialización
+    window.addEventListener('DOMContentLoaded', () => {
+      renderFaultTags();
+      updatePriceDisplay();
+      setupCanvas();
+    });
+
+    // Renderizar tags de falla
+    function renderFaultTags() {
+      const container = document.getElementById('fault-tags-container');
+      container.innerHTML = COMMON_FAULTS.map(fault => {
+        const isSelected = fault === selectedFault;
+        return `
+          <button type="button" onclick="selectFault('${fault}')" class="mechanic-btn p-3 rounded-xl font-bold text-left text-sm border-2 transition ${
+            isSelected 
+              ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md' 
+              : 'bg-slate-900 text-slate-200 border-slate-800 hover:border-slate-700'
+          }">
+            ${fault}
+          </button>
+        `;
+      }).join('');
+    }
+
+    function selectFault(fault) {
+      selectedFault = fault;
+      renderFaultTags();
+      document.getElementById('client-part-tag').textContent = fault;
+    }
+
+    // Teclado numérico gigante
+    function pressNumpad(key) {
+      let str = priceNumber ? priceNumber.toString() : '';
+      if (key === 'C') {
+        priceNumber = 0;
+      } else if (key === '000') {
+        if (str.length > 0 && str.length <= 6) {
+          priceNumber = parseInt(str + '000', 10);
+        }
+      } else {
+        if (str === '0') str = '';
+        if (str.length < 8) {
+          str += key;
+          priceNumber = parseInt(str, 10);
+        }
+      }
+      updatePriceDisplay();
+    }
+
+    function updatePriceDisplay() {
+      const formatted = '$ ' + priceNumber.toLocaleString('es-CO');
+      document.getElementById('price-display').textContent = formatted;
+      document.getElementById('client-price-tag').textContent = formatted;
+      document.getElementById('legal-price-span').textContent = formatted;
+      document.getElementById('btn-approve-label').textContent = `APROBAR REPARACIÓN (${formatted})`;
+    }
+
+    // Cargar foto propia
+    function handlePhotoUpload(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          photoUrl = e.target.result;
+          document.getElementById('photo-preview').src = photoUrl;
+          document.getElementById('client-photo-view').src = photoUrl;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // Dictado de voz (Web Speech API o Simulación)
+    function toggleVoiceDictation() {
+      const voiceBtn = document.getElementById('voice-btn');
+      const voiceIcon = document.getElementById('voice-icon');
+      const voiceText = document.getElementById('voice-text');
+
+      if (isRecording) return;
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        try {
+          const recognition = new SpeechRecognition();
+          recognition.lang = 'es-CO';
+          recognition.interimResults = false;
+          
+          recognition.onstart = () => {
+            isRecording = true;
+            voiceBtn.classList.add('bg-red-600', 'border-red-400', 'recording-active');
+            voiceText.textContent = 'ESCUCHANDO... HABLE AHORA';
+          };
+          
+          recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            voiceTranscript = transcript;
+            document.getElementById('voice-transcript').textContent = `"${transcript}"`;
+            document.getElementById('client-voice-note').textContent = `"${transcript}"`;
+          };
+
+          recognition.onerror = () => {
+            simulateVoice();
+          };
+
+          recognition.onend = () => {
+            isRecording = false;
+            voiceBtn.classList.remove('bg-red-600', 'border-red-400', 'recording-active');
+            voiceText.textContent = 'DICTAR NOTA POR VOZ';
+          };
+
+          recognition.start();
+          return;
+        } catch (e) {
+          // Fallback a simulación
+        }
+      }
+
+      simulateVoice();
+    }
+
+    function simulateVoice() {
+      const voiceBtn = document.getElementById('voice-btn');
+      const voiceText = document.getElementById('voice-text');
+      isRecording = true;
+      voiceBtn.classList.add('bg-red-600', 'border-red-400', 'recording-active');
+      voiceText.textContent = 'ESCUCHANDO NOTA DE VOZ...';
+
+      setTimeout(() => {
+        voiceTranscript = 'Se detectó fuga en retén y disco al 90% de desgaste. Requiere cambio urgente.';
+        document.getElementById('voice-transcript').textContent = `"${voiceTranscript}"`;
+        document.getElementById('client-voice-note').textContent = `"${voiceTranscript}"`;
+        isRecording = false;
+        voiceBtn.classList.remove('bg-red-600', 'border-red-400', 'recording-active');
+        voiceText.textContent = 'DICTAR NOTA POR VOZ';
+      }, 1300);
+    }
+
+    // Envío desde vista mecánico (CA-02)
+    function submitQuote() {
+      if (priceNumber <= 0) {
+        alert('Por favor digita un monto válido usando el teclado numérico.');
+        return;
+      }
+
+      // Bloqueo de estado a ESPERANDO_APROBACION
+      orderStatus = 'ESPERANDO_APROBACION';
+      quoteStatus = 'PENDIENTE';
+      
+      updateStatusUI();
+      switchView('CLIENTE');
+    }
+
+    // Switch de pestañas
+    function switchView(view) {
+      currentView = view;
+      const tabMech = document.getElementById('tab-mechanic');
+      const tabClient = document.getElementById('tab-client');
+      const viewMech = document.getElementById('view-mechanic');
+      const viewClient = document.getElementById('view-client');
+
+      if (view === 'MECANICO') {
+        tabMech.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-amber-500 text-slate-950 shadow';
+        tabClient.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
+        viewMech.classList.remove('hidden');
+        viewClient.classList.add('hidden');
+        document.body.className = 'bg-slate-950 text-slate-100 min-h-screen flex flex-col';
+      } else {
+        tabClient.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-emerald-500 text-slate-950 shadow';
+        tabMech.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white';
+        viewClient.classList.remove('hidden');
+        viewMech.classList.add('hidden');
+        document.body.className = 'bg-slate-100 text-slate-900 min-h-screen flex flex-col';
+      }
+    }
+
+    // Configuración del canvas de firma
+    function setupCanvas() {
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      function getPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return {
+          x: (clientX - rect.left) * (canvas.width / rect.width),
+          y: (clientY - rect.top) * (canvas.height / rect.height)
+        };
+      }
+
+      function start(e) {
+        e.preventDefault();
+        isDrawing = true;
+        const pos = getPos(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        document.getElementById('sig-placeholder').style.display = 'none';
+        hasSigned = true;
+        validateClientForm();
+      }
+
+      function move(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      }
+
+      function stop() {
+        isDrawing = false;
+      }
+
+      canvas.addEventListener('mousedown', start);
+      canvas.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', stop);
+
+      canvas.addEventListener('touchstart', start, { passive: false });
+      canvas.addEventListener('touchmove', move, { passive: false });
+      window.addEventListener('touchend', stop);
+    }
+
+    function clearSignatureCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      hasSigned = false;
+      document.getElementById('sig-placeholder').style.display = 'flex';
+      validateClientForm();
+    }
+
+    // Validación del formulario del cliente (CA-03)
+    function validateClientForm() {
+      const phone = document.getElementById('input-phone-last4').value.trim();
+      const legalChecked = document.getElementById('legal-checkbox').checked;
+      const btnApprove = document.getElementById('btn-approve');
+
+      const isValid = (phone.length === 4) && legalChecked && hasSigned;
+
+      if (isValid) {
+        btnApprove.disabled = false;
+        btnApprove.className = 'w-full min-h-[58px] rounded-xl font-black text-base flex items-center justify-center gap-2 transition bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg active:scale-95 cursor-pointer';
+      } else {
+        btnApprove.disabled = true;
+        btnApprove.className = 'w-full min-h-[58px] rounded-xl font-black text-base flex items-center justify-center gap-2 transition bg-slate-200 text-slate-400 cursor-not-allowed shadow-none';
+      }
+    }
+
+    // Resolver cotización (Aprobar / Rechazar) (CA-04 y CA-05)
+    function resolveQuote(decision) {
+      quoteStatus = decision;
+      orderStatus = (decision === 'APROBADO') ? 'EN_REPARACION' : 'RECHAZADO';
+
+      const phone = document.getElementById('input-phone-last4').value.trim() || '4912';
+      const sigData = canvas.toDataURL('image/png');
+
+      // Registro de Auditoría Inmutable
+      auditRecord = {
+        quoteId: 'COT-8842',
+        action: decision,
+        timestamp: new Date().toISOString(),
+        clientIp: '186.84.22.109 (Verificada)',
+        userAgent: navigator.userAgent.slice(0, 60) + '...',
+        clientPhoneLast4: phone,
+        signatureDataUrl: sigData
+      };
+
+      // Ocultar formulario de aprobación y mostrar certificado inmutable
+      document.getElementById('client-approval-form').classList.add('hidden');
+      const certBox = document.getElementById('audit-certificate-box');
+      certBox.classList.remove('hidden');
+
+      document.getElementById('audit-action').textContent = decision;
+      document.getElementById('audit-action').className = decision === 'APROBADO' ? 'text-emerald-400 font-bold' : 'text-red-400 font-bold';
+      document.getElementById('audit-timestamp').textContent = auditRecord.timestamp;
+      document.getElementById('audit-ip').textContent = auditRecord.clientIp;
+      document.getElementById('audit-phone').textContent = `***-${phone}`;
+      document.getElementById('audit-sig-preview').src = sigData;
+
+      updateStatusUI();
+    }
+
+    // Actualizar elementos visuales según estado
+    function updateStatusUI() {
+      const banner = document.getElementById('order-status-banner');
+      const icon = document.getElementById('order-status-icon');
+      const text = document.getElementById('order-status-text');
+
+      const qBanner = document.getElementById('quote-status-banner');
+      const qIcon = document.getElementById('quote-status-icon');
+      const qTitle = document.getElementById('quote-status-title');
+
+      const progressBar = document.getElementById('progress-bar-fill');
+      const stepApproval = document.getElementById('step-approval');
+      const stepRepair = document.getElementById('step-repair');
+
+      if (orderStatus === 'EN_REVISION') {
+        banner.className = 'p-3.5 rounded-xl border-2 font-bold text-sm flex items-center justify-between bg-blue-950/60 border-blue-500/80 text-blue-300';
+        icon.textContent = '🔍';
+        text.textContent = 'EN REVISIÓN';
+        progressBar.style.width = '25%';
+      } else if (orderStatus === 'ESPERANDO_APROBACION') {
+        banner.className = 'p-3.5 rounded-xl border-2 font-bold text-sm flex items-center justify-between bg-amber-950/60 border-amber-500 text-amber-300';
+        icon.textContent = '⏳';
+        text.textContent = 'ESPERANDO APROBACIÓN';
+        
+        qBanner.className = 'p-3.5 font-black text-sm flex items-center gap-2 bg-amber-500 text-slate-950';
+        qIcon.textContent = '⚠️';
+        qTitle.textContent = 'REPARACIÓN EXTRA: REQUIERE TU AUTORIZACIÓN';
+        progressBar.style.width = '50%';
+        stepApproval.className = 'text-amber-600 font-black';
+      } else if (orderStatus === 'EN_REPARACION') {
+        banner.className = 'p-3.5 rounded-xl border-2 font-bold text-sm flex items-center justify-between bg-emerald-950/60 border-emerald-500 text-emerald-300';
+        icon.textContent = '⚡';
+        text.textContent = 'EN REPARACIÓN';
+
+        qBanner.className = 'p-3.5 font-black text-sm flex items-center gap-2 bg-emerald-600 text-white';
+        qIcon.textContent = '✅';
+        qTitle.textContent = 'PRESUPUESTO APROBADO POR EL CLIENTE';
+        progressBar.style.width = '75%';
+        progressBar.className = 'h-full bg-emerald-600 transition-all duration-500';
+        stepApproval.className = 'text-emerald-600 font-bold';
+        stepRepair.className = 'text-emerald-600 font-black';
+      } else if (orderStatus === 'RECHAZADO') {
+        banner.className = 'p-3.5 rounded-xl border-2 font-bold text-sm flex items-center justify-between bg-red-950/60 border-red-500 text-red-300';
+        icon.textContent = '🚫';
+        text.textContent = 'COTIZACIÓN RECHAZADA';
+
+        qBanner.className = 'p-3.5 font-black text-sm flex items-center gap-2 bg-red-600 text-white';
+        qIcon.textContent = '❌';
+        qTitle.textContent = 'PRESUPUESTO RECHAZADO POR EL CLIENTE';
+      }
+    }
+
+    // Compartir por WhatsApp
+    function shareViaWhatsApp() {
+      const msg = `*TALLER DON RAMIRO - ORDEN KJM-482*%0A` +
+        `Vehículo: Renault Stepway%0A` +
+        `Reparación adicional: ${selectedFault}%0A` +
+        `Costo: $ ${priceNumber.toLocaleString('es-CO')}%0A` +
+        `Estado: ${quoteStatus}%0A` +
+        `Comprobante inmutable emitido: COT-8842`;
+      window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank');
+    }
+
+    // Reiniciar demo
+    function resetDemo() {
+      orderStatus = 'EN_REVISION';
+      quoteStatus = 'PENDIENTE';
+      priceNumber = 185000;
+      selectedFault = 'Pastillas de Freno';
+      hasSigned = false;
+      auditRecord = null;
+
+      document.getElementById('client-approval-form').classList.remove('hidden');
+      document.getElementById('audit-certificate-box').classList.add('hidden');
+      document.getElementById('input-phone-last4').value = '';
+      document.getElementById('legal-checkbox').checked = false;
+      clearSignatureCanvas();
+
+      updatePriceDisplay();
+      renderFaultTags();
+      updateStatusUI();
+      switchView('MECANICO');
+    }
+  </script>
+</body>
+</html>
